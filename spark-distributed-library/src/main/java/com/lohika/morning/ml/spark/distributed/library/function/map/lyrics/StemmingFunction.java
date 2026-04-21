@@ -7,7 +7,8 @@ import org.tartarus.snowball.SnowballStemmer;
 
 public class StemmingFunction implements MapFunction<Row, Row> {
 
-    private SnowballStemmer stemmer = initializeStemmer();
+    // Must not be serialized with the Spark closure.
+    private transient SnowballStemmer stemmer;
 
     private SnowballStemmer initializeStemmer() {
         try {
@@ -21,6 +22,10 @@ public class StemmingFunction implements MapFunction<Row, Row> {
 
     @Override
     public Row call(Row input) throws Exception {
+        if (stemmer == null) {
+            stemmer = initializeStemmer();
+        }
+
         stemmer.setCurrent(input.getAs(Column.FILTERED_WORD.getName()));
         stemmer.stem();
         String stemmedWord = stemmer.getCurrent();

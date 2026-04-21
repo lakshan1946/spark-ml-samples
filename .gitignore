@@ -17,3 +17,7 @@ target/
 # Grale
 build/
 .gradle
+
+# Generated submission bundles
+spark-ml-samples-lyrics7-8class.zip
+*.zip

@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lyrics 8-Class Classifier</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --panel: #fffdf8;
+      --ink: #1a1d26;
+      --muted: #5a6377;
+      --accent: #0c7a63;
+      --accent-2: #c65a2f;
+      --line: #ddd5c9;
+      --shadow: 0 8px 26px rgba(38, 31, 21, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1000px 600px at -10% -20%, #ead7c1 0%, transparent 60%),
+        radial-gradient(900px 500px at 110% 10%, #cfe4de 0%, transparent 58%),
+        linear-gradient(180deg, #f8f4ee 0%, #f3ece0 100%);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 560px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .card h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    .card p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    textarea {
+      width: 100%;
+      border: 1px solid #cec6b9;
+      border-radius: 10px;
+      background: #fff;
+      color: var(--ink);
+      padding: 10px;
+      font: inherit;
+      min-height: 140px;
+      resize: vertical;
+      margin-bottom: 12px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 700;
+      color: #fff;
+      background: var(--accent);
+      transition: transform 120ms ease, filter 120ms ease;
+    }
+
+    button.alt { background: var(--accent-2); }
+
+    button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+
+    pre {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 10px;
+      background: #111722;
+      color: #d8e6ff;
+      border: 1px solid #2e3c58;
+      max-height: 280px;
+      overflow: auto;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .chart {
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid #d6cebf;
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 110px 1fr 64px;
+      align-items: center;
+      gap: 8px;
+      margin: 6px 0;
+      font-size: 12px;
+    }
+
+    .bar-label {
+      text-transform: capitalize;
+      color: var(--muted);
+    }
+
+    .bar-wrap {
+      background: #ede8e1;
+      border-radius: 4px;
+      height: 16px;
+      overflow: hidden;
+    }
+
+    .bar {
+      background: var(--accent);
+      height: 100%;
+      border-radius: 4px;
+      transition: width 300ms ease-out;
+    }
+
+    .bar-value {
+      font-weight: 700;
+      font-feature-settings: "tnum";
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Lyrics 8-Class Genre Classification</h1>
+    <p>Paste lyrics and classify into pop, country, blues, jazz, reggae, rock, hip hop, or folk.</p>
+
+    <label for="lyrics-input">Lyrics Input</label>
+    <textarea id="lyrics-input" placeholder="Streetlights glow while the bass keeps moving all night, hands in the air and the rhythm drives the crowd."></textarea>
+
+    <div class="actions">
+      <button id="predict-btn" type="button">Predict Genre</button>
+      <button id="train-btn" type="button" class="alt">Train Model</button>
+    </div>
+
+    <pre id="result">Ready.</pre>
+    <section id="chart" class="chart" hidden></section>
+  </main>
+
+  <script>
+    function showResult(data) {
+      document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+    }
+
+    function renderBarChart(data) {
+      const chart = document.getElementById("chart");
+      chart.innerHTML = "";
+
+      if (!Array.isArray(data) || data.length === 0) {
+        chart.hidden = true;
+        return;
+      }
+
+      const normalized = data.map(function(item) {
+        const raw = item && item.score !== undefined ? item.score : item.value;
+        return {
+          genre: item.genre,
+          score: Number(raw)
+        };
+      }).filter(function(item) {
+        return !isNaN(item.score);
+      });
+
+      if (normalized.length === 0) {
+        chart.hidden = true;
+        return;
+      }
+
+      const sorted = normalized.slice().sort(function(a, b) {
+        return b.score - a.score;
+      });
+      const maxScore = Math.max.apply(null, sorted.map(function(item) { return item.score; }));
+      const safeMax = maxScore > 0 ? maxScore : 1;
+
+      sorted.forEach(function(item) {
+        const row = document.createElement("div");
+        row.className = "bar-row";
+
+        const label = document.createElement("div");
+        label.className = "bar-label";
+        label.textContent = item.genre;
+
+        const barWrap = document.createElement("div");
+        barWrap.className = "bar-wrap";
+
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        bar.style.width = "0%";
+        barWrap.appendChild(bar);
+
+        const value = document.createElement("div");
+        value.className = "bar-value";
+        value.textContent = Number(item.score).toFixed(4);
+
+        row.appendChild(label);
+        row.appendChild(barWrap);
+        row.appendChild(value);
+        chart.appendChild(row);
+
+        setTimeout(function() {
+          bar.style.width = ((item.score / safeMax) * 100).toFixed(2) + "%";
+        }, 10);
+      });
+
+      chart.hidden = false;
+    }
+
+    async function requestJson(url, options) {
+      const response = await fetch(url, options || {});
+      let body;
+
+      try {
+        body = await response.json();
+      } catch (e) {
+        body = { error: "Invalid JSON response" };
+      }
+
+      if (!response.ok) {
+        throw body;
+      }
+
+      return body;
+    }
+
+    async function trainModel() {
+      showResult({ status: "Training started..." });
+      document.getElementById("chart").hidden = true;
+
+      try {
+        const result = await requestJson("/lyrics7/train");
+        showResult(result);
+      } catch (error) {
+        showResult({ error: error.error || error.message || "Training failed" });
+      }
+    }
+
+    async function predictGenre() {
+      const text = document.getElementById("lyrics-input").value;
+
+      if (!text || !text.trim()) {
+        showResult({ error: "Lyrics input cannot be empty." });
+        document.getElementById("chart").hidden = true;
+        return;
+      }
+
+      showResult({ status: "Predicting..." });
+
+      try {
+        const result = await requestJson("/lyrics7/predict", {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain; charset=UTF-8"
+          },
+          body: text
+        });
+        showResult(result);
+        renderBarChart(result.probabilities || []);
+      } catch (error) {
+        showResult({ error: error.error || error.message || "Prediction failed" });
+        document.getElementById("chart").hidden = true;
+      }
+    }
+
+    document.getElementById("train-btn").addEventListener("click", trainModel);
+    document.getElementById("predict-btn").addEventListener("click", predictGenre);
+  </script>
+</body>
+</html>
