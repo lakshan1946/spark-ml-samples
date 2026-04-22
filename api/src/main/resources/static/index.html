@@ -164,7 +164,6 @@
 
     <div class="actions">
       <button id="predict-btn" type="button">Predict Genre</button>
-      <button id="train-btn" type="button" class="alt">Train Model</button>
     </div>
 
     <pre id="result">Ready.</pre>
@@ -295,8 +294,15 @@
       }
     }
 
-    document.getElementById("train-btn").addEventListener("click", trainModel);
-    document.getElementById("predict-btn").addEventListener("click", predictGenre);
+    const trainButton = document.getElementById("train-btn");
+    if (trainButton) {
+      trainButton.addEventListener("click", trainModel);
+    }
+
+    const predictButton = document.getElementById("predict-btn");
+    if (predictButton) {
+      predictButton.addEventListener("click", predictGenre);
+    }
   </script>
 </body>
 </html>
